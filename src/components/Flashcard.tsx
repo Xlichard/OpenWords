@@ -58,7 +58,12 @@ export default function Flashcard({
             </div>
           )}
 
-          <div onClick={(e) => e.stopPropagation()}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
             <AudioButton
               word={word.word}
               className="mt-2 text-gray-500 hover:text-blue-500 dark:text-gray-400"

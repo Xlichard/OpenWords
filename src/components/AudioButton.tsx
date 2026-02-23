@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AudioButtonProps {
   word: string;
@@ -13,37 +13,56 @@ export default function AudioButton({
   accent = "en-US",
   className = "",
 }: AudioButtonProps) {
-  const [supported, setSupported] = useState(true);
   const [speaking, setSpeaking] = useState(false);
+  const lastTriggerTsRef = useRef(0);
+  const supported =
+    typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
-    setSupported(typeof window !== "undefined" && "speechSynthesis" in window);
-  }, []);
+    if (!supported) return;
+    // Warm up voices list for Safari/iOS
+    window.speechSynthesis.getVoices();
+  }, [supported]);
+  const speakWord = useCallback(() => {
+    if (!supported || speaking || typeof window === "undefined") return;
 
-  const speak = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation(); // Don't trigger card flip
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = accent;
+    utterance.rate = 0.9;
+
+    const voices = synth.getVoices();
+    const preferred = voices.find((voice) => voice.lang === accent);
+    if (preferred) {
+      utterance.voice = preferred;
+    }
+
+    utterance.onstart = () => setSpeaking(true);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+
+    synth.cancel();
+    synth.speak(utterance);
+  }, [word, accent, supported, speaking]);
+
+  const handleSpeak = useCallback(
+    (e: React.SyntheticEvent) => {
+      e.stopPropagation();
       e.preventDefault();
 
-      if (!supported || speaking) return;
+      const now = Date.now();
+      if (now - lastTriggerTsRef.current < 280) return;
+      lastTriggerTsRef.current = now;
 
-      const utterance = new SpeechSynthesisUtterance(word);
-      utterance.lang = accent;
-      utterance.rate = 0.9;
-
-      utterance.onstart = () => setSpeaking(true);
-      utterance.onend = () => setSpeaking(false);
-      utterance.onerror = () => setSpeaking(false);
-
-      window.speechSynthesis.cancel(); // Cancel any ongoing speech
-      window.speechSynthesis.speak(utterance);
+      speakWord();
     },
-    [word, accent, supported, speaking]
+    [speakWord]
   );
 
   if (!supported) {
     return (
       <button
+        type="button"
         className={`opacity-30 cursor-not-allowed ${className}`}
         title="浏览器不支持语音合成"
         disabled
@@ -55,7 +74,11 @@ export default function AudioButton({
 
   return (
     <button
-      onClick={speak}
+      type="button"
+      onClick={handleSpeak}
+      onTouchEnd={handleSpeak}
+      onPointerDown={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
       className={`hover:scale-110 active:scale-95 transition-transform ${
         speaking ? "text-blue-500 animate-pulse" : ""
       } ${className}`}
