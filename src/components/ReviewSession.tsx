@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import LearnSession from "./LearnSession";
 import Link from "next/link";
 import { getCategoryWordIds, getWordsByIds } from "@/lib/actions";
-import { getDueWordIdsForCategory } from "@/lib/storage";
+import { getAllCardStates } from "@/lib/storage";
 import type { Word } from "@/types";
 
 interface ReviewSessionProps {
@@ -23,10 +23,21 @@ export default function ReviewSession({
   useEffect(() => {
     async function loadDueWords() {
       try {
-        // Get all word IDs for this category
-        const allWordIds = await getCategoryWordIds(category);
-        // Find which ones are due for review
-        const dueIds = await getDueWordIdsForCategory(allWordIds);
+        const [allWordIds, allCards] = await Promise.all([
+          getCategoryWordIds(category),
+          getAllCardStates(),
+        ]);
+        const wordIdSet = new Set(allWordIds);
+        const now = new Date().toISOString();
+        const dueIds = allCards
+          .filter(
+            (card) =>
+              card.repetitions > 0 &&
+              card.nextReview <= now &&
+              wordIdSet.has(card.wordId)
+          )
+          .sort((a, b) => a.nextReview.localeCompare(b.nextReview))
+          .map((card) => card.wordId);
 
         if (dueIds.length === 0) {
           setWords([]);

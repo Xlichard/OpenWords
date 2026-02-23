@@ -11,6 +11,7 @@ interface ListDetailProps {
   category: string;
   categoryLabel: string;
   listIndex: number;
+  listSize?: number;
   backUrl: string;
   groupUrlPrefix?: string; // e.g. "/custom/abc/list/0" — if omitted, defaults to /learn/{category}/list/{listIndex}
 }
@@ -20,11 +21,13 @@ export default function ListDetail({
   category,
   categoryLabel,
   listIndex,
+  listSize,
   backUrl,
   groupUrlPrefix,
 }: ListDetailProps) {
   const [mode, setMode] = useState<"recite" | "learn">("recite");
   const [groupSize, setGroupSize] = useState(20);
+  const effectiveListSize = listSize ?? 80;
 
   useEffect(() => {
     getSettings().then((s) => setGroupSize(s.groupSize));
@@ -88,7 +91,11 @@ export default function ListDetail({
             return (
               <Link
                 key={i}
-                href={`${groupUrlPrefix ?? `/learn/${category}/list/${listIndex}`}/group/${i}`}
+                href={`${groupUrlPrefix ?? `/learn/${category}/list/${listIndex}`}/group/${i}${
+                  groupUrlPrefix
+                    ? ""
+                    : `?listSize=${effectiveListSize}&groupSize=${groupSize}`
+                }`}
                 className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:-translate-y-0.5 transition-all"
               >
                 <div className="text-lg font-bold text-gray-900 dark:text-white">

@@ -14,7 +14,8 @@ export default async function ListLearnPage({
 }: ListLearnPageProps) {
   const { category, listId } = await params;
   const sp = await searchParams;
-  const listSize = parseInt(sp.listSize || "80", 10);
+  const parsedListSize = Number.parseInt(sp.listSize || "80", 10);
+  const listSize = Number.isFinite(parsedListSize) && parsedListSize > 0 ? parsedListSize : 80;
   const listIndex = parseInt(listId, 10);
 
   const catConfig = CATEGORIES.find((c) => c.tag === category);
@@ -55,6 +56,7 @@ export default async function ListLearnPage({
         category={category}
         categoryLabel={catConfig.label}
         listIndex={listIndex}
+        listSize={listSize}
         backUrl={`/learn/${category}`}
       />
     </main>

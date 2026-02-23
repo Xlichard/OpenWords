@@ -14,8 +14,10 @@ export default async function GroupLearnPage({
 }: GroupLearnPageProps) {
   const { category, listId, groupId } = await params;
   const sp = await searchParams;
-  const listSize = parseInt(sp.listSize || "80", 10);
-  const groupSize = parseInt(sp.groupSize || "20", 10);
+  const parsedListSize = Number.parseInt(sp.listSize || "80", 10);
+  const parsedGroupSize = Number.parseInt(sp.groupSize || "20", 10);
+  const listSize = Number.isFinite(parsedListSize) && parsedListSize > 0 ? parsedListSize : 80;
+  const groupSize = Number.isFinite(parsedGroupSize) && parsedGroupSize > 0 ? parsedGroupSize : 20;
   const listIndex = parseInt(listId, 10);
   const groupIndex = parseInt(groupId, 10);
 
@@ -46,7 +48,7 @@ export default async function GroupLearnPage({
         <div className="text-4xl">📭</div>
         <p className="text-gray-500">该分组暂无单词</p>
         <Link
-          href={`/learn/${category}/list/${listId}`}
+          href={`/learn/${category}/list/${listId}?listSize=${listSize}`}
           className="text-blue-500 hover:underline"
         >
           返回列表
@@ -61,7 +63,7 @@ export default async function GroupLearnPage({
         words={words}
         category={category}
         categoryLabel={`${catConfig.label} · 列表 ${listIndex + 1} · 第 ${groupIndex + 1} 组`}
-        backUrl={`/learn/${category}/list/${listId}`}
+        backUrl={`/learn/${category}/list/${listId}?listSize=${listSize}`}
       />
     </main>
   );

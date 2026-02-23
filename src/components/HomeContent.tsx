@@ -6,8 +6,7 @@ import CategoryCard from "./CategoryCard";
 import type { Category, CustomModule } from "@/types";
 import { getCategoryWordIds } from "@/lib/actions";
 import {
-  getLearnedCountForCategory,
-  getDueCardsForWordIds,
+  getAllCardStates,
   getAllCustomModules,
 } from "@/lib/storage";
 
@@ -24,24 +23,50 @@ export default function HomeContent({ categories }: HomeContentProps) {
 
   useEffect(() => {
     async function loadProgress() {
-      const learned: Record<string, number> = {};
-      const due: Record<string, number> = {};
-      for (const cat of categories) {
-        try {
-          const wordIds = await getCategoryWordIds(cat.tag);
-          learned[cat.tag] = await getLearnedCountForCategory(wordIds);
-          due[cat.tag] = await getDueCardsForWordIds(wordIds);
-        } catch {
+      try {
+        const [allCards, modules, categoryWords] = await Promise.all([
+          getAllCardStates(),
+          getAllCustomModules(),
+          Promise.all(
+            categories.map(async (cat) => ({
+              tag: cat.tag,
+              wordIds: await getCategoryWordIds(cat.tag),
+            }))
+          ),
+        ]);
+
+        const now = new Date().toISOString();
+        const cardMap = new Map(allCards.map((card) => [card.wordId, card]));
+        const learned: Record<string, number> = {};
+        const due: Record<string, number> = {};
+
+        for (const { tag, wordIds } of categoryWords) {
+          let learnedCount = 0;
+          let dueCount = 0;
+          for (const id of wordIds) {
+            const state = cardMap.get(id);
+            if (!state || state.repetitions <= 0) continue;
+            learnedCount += 1;
+            if (state.nextReview <= now) dueCount += 1;
+          }
+          learned[tag] = learnedCount;
+          due[tag] = dueCount;
+        }
+
+        setLearnedCounts(learned);
+        setDueCounts(due);
+        setCustomModules(modules);
+      } catch {
+        const learned: Record<string, number> = {};
+        const due: Record<string, number> = {};
+        for (const cat of categories) {
           learned[cat.tag] = 0;
           due[cat.tag] = 0;
         }
+        setLearnedCounts(learned);
+        setDueCounts(due);
+        setCustomModules([]);
       }
-      setLearnedCounts(learned);
-      setDueCounts(due);
-
-      // Load custom modules
-      const modules = await getAllCustomModules();
-      setCustomModules(modules);
     }
     loadProgress();
   }, [categories]);

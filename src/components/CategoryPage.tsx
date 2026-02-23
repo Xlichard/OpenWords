@@ -5,7 +5,7 @@ import Link from "next/link";
 import ListSelector from "./ListSelector";
 import SettingsPanel from "./SettingsPanel";
 import type { UserSettings } from "@/types";
-import { getListCount, getCategories } from "@/lib/actions";
+import { getCategoryWordIds } from "@/lib/actions";
 import { getSettings, saveSettings } from "@/lib/storage";
 
 interface CategoryPageProps {
@@ -26,15 +26,21 @@ export default function CategoryPage({
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [listCount, setListCount] = useState(0);
   const [totalWords, setTotalWords] = useState(0);
+  const [wordIds, setWordIds] = useState<number[]>([]);
   const [showSettings, setShowSettings] = useState(false);
 
   const loadData = useCallback(
     async (s: UserSettings) => {
-      const count = await getListCount(category, s.listSize);
-      setListCount(count);
-      const cats = await getCategories();
-      const cat = cats.find((c) => c.tag === category);
-      setTotalWords(cat?.count ?? 0);
+      try {
+        const ids = await getCategoryWordIds(category);
+        setWordIds(ids);
+        setTotalWords(ids.length);
+        setListCount(Math.ceil(ids.length / s.listSize));
+      } catch {
+        setWordIds([]);
+        setTotalWords(0);
+        setListCount(0);
+      }
     },
     [category]
   );
@@ -50,8 +56,11 @@ export default function CategoryPage({
 
   const handleSaveSettings = async (newSettings: UserSettings) => {
     await saveSettings(newSettings);
+    const shouldReloadLists = !settings || settings.listSize !== newSettings.listSize;
     setSettings(newSettings);
-    await loadData(newSettings);
+    if (shouldReloadLists) {
+      await loadData(newSettings);
+    }
   };
 
   if (!settings) {
@@ -93,9 +102,9 @@ export default function CategoryPage({
 
       <ListSelector
         category={category}
-        categoryLabel={catLabel}
         listCount={listCount}
         totalWords={totalWords}
+        wordIds={wordIds}
         listSize={settings.listSize}
         color={catColor}
       />
