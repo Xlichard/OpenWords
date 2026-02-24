@@ -1,0 +1,74 @@
+name: Daily Article Crawl
+
+on:
+  schedule:
+    # 10:00 AM CST (UTC+8) = 02:00 UTC
+    - cron: '0 2 * * *'
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to push updated data files back
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      # ── 2. Python setup ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: data/requirements.txt
+
+      # ── 3. Install dependencies ─────────────────────────────────────────────
+      - name: Install dependencies
+        run: pip install -r data/requirements.txt
+
+      # ── 4. Crawl articles ───────────────────────────────────────────────────
+      #   The crawler writes to data/articles.db (relative to data/ directory)
+      - name: Crawl articles
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          cd data
+          python run_crawler.py
+
+      # ── 5. Export JSON daily archives ───────────────────────────────────────
+      - name: Export JSON archives
+        run: |
+          cd data
+          python export_json.py
+
+      # ── 6. Sync DB to repo root (where the Next.js app reads it) ────────────
+      - name: Sync articles.db → repo root
+        run: cp data/articles.db articles.db
+
+      # ── 7. Commit & push (only if something changed) ────────────────────────
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add articles.db \
+                  data/articles.db \
+                  "data/articles/" \
+                  data/index.json
+
+          if git diff --staged --quiet; then
+            echo "No new articles — nothing to commit."
+          else
+            TODAY=$(date -u +'%Y-%m-%d')
+            git commit -m "📰 Daily article update ${TODAY}
+
+Co-Authored-By: Warp <agent@warp.dev>"
+            git push
+          fi

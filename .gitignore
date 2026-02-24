@@ -39,3 +39,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ── Python crawler ────────────────────────────────────────────────────────────
+data/__pycache__/
+data/**/__pycache__/
+data/*.pyc
+data/.venv/
+data/venv/
+# Large static data files — not committed
+data/raw/
+data/ecdict.csv
+data/*.csv
+# SQLite WAL/SHM temp files
+*.db-shm
+*.db-wal
+
+# ── vocab.db is local-only (large, not crawled by Actions) ───────────────────
+vocab.db

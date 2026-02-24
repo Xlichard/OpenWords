@@ -1,0 +1,11 @@
+# OpenWords Article Crawler - Python dependencies
+# Install with: pip install -r requirements.txt
+
+feedparser>=6.0.11        # RSS/Atom feed parsing
+requests>=2.32.0          # HTTP client
+beautifulsoup4>=4.12.0    # HTML parsing
+lxml>=5.0.0               # Fast HTML parser (BeautifulSoup backend)
+schedule>=1.2.2           # Daily loop scheduler
+
+# DeepSeek translation + sentence analysis (required for AI features):
+openai>=1.0.0
