@@ -67,8 +67,7 @@ jobs:
             echo "No new articles — nothing to commit."
           else
             TODAY=$(date -u +'%Y-%m-%d')
-            git commit -m "📰 Daily article update ${TODAY}
-
-Co-Authored-By: Warp <agent@warp.dev>"
+            MSG="📰 Daily article update ${TODAY}"$'\n\nCo-Authored-By: Warp <agent@warp.dev>'
+            git commit -m "$MSG"
             git push
           fi
