@@ -9,6 +9,7 @@ import { CATEGORIES } from "@/types";
  */
 export async function getCategories(): Promise<Category[]> {
   const db = getDb();
+  if (!db) return CATEGORIES.map((cat) => ({ ...cat, count: 0 }));
   return CATEGORIES.map((cat) => {
     const row = db
       .prepare("SELECT COUNT(*) as count FROM words WHERE tags LIKE ?")
@@ -25,6 +26,7 @@ export async function getWords(
   limit: number = 20
 ): Promise<Word[]> {
   const db = getDb();
+  if (!db) return [];
   const rows = db
     .prepare(
       "SELECT * FROM words WHERE tags LIKE ? ORDER BY RANDOM() LIMIT ?"
@@ -39,7 +41,8 @@ export async function getWords(
 export async function getWordsByIds(ids: number[]): Promise<Word[]> {
   if (ids.length === 0) return [];
   const db = getDb();
-  const placeholders = ids.map(() => "?").join(",");
+  if (!db) return [];
+  const placeholders
   const rows = db
     .prepare(`SELECT * FROM words WHERE id IN (${placeholders})`)
     .all(...ids) as Word[];
@@ -54,6 +57,7 @@ export async function searchWords(
   limit: number = 20
 ): Promise<Word[]> {
   const db = getDb();
+  if (!db) return [];
   const rows = db
     .prepare("SELECT * FROM words WHERE word LIKE ? ORDER BY word LIMIT ?")
     .all(`${query}%`, limit) as Word[];
@@ -65,6 +69,7 @@ export async function searchWords(
  */
 export async function getCategoryWordIds(category: string): Promise<number[]> {
   const db = getDb();
+  if (!db) return [];
   const rows = db
     .prepare("SELECT id FROM words WHERE tags LIKE ? ORDER BY (id * 2654435761) % 4294967296")
     .all(`%${category}%`) as { id: number }[];
@@ -79,6 +84,7 @@ export async function getListCount(
   listSize: number = 20
 ): Promise<number> {
   const db = getDb();
+  if (!db) return 0;
   const row = db
     .prepare("SELECT COUNT(*) as count FROM words WHERE tags LIKE ?")
     .get(`%${category}%`) as { count: number };
@@ -94,7 +100,8 @@ export async function getWordsForList(
   listSize: number = 20
 ): Promise<Word[]> {
   const db = getDb();
-  const offset = listIndex * listSize;
+  if (!db) return [];
+  const offset
   const rows = db
     .prepare(
       "SELECT * FROM words WHERE tags LIKE ? ORDER BY (id * 2654435761) % 4294967296 LIMIT ? OFFSET ?"
@@ -114,7 +121,8 @@ export async function getWordsForGroup(
   groupSize: number = 20
 ): Promise<Word[]> {
   const db = getDb();
-  const offset = listIndex * listSize + groupIndex * groupSize;
+  if (!db) return [];
+  const offset
   const rows = db
     .prepare(
       "SELECT * FROM words WHERE tags LIKE ? ORDER BY (id * 2654435761) % 4294967296 LIMIT ? OFFSET ?"
@@ -132,7 +140,8 @@ export async function getWordIdsForList(
   listSize: number = 20
 ): Promise<number[]> {
   const db = getDb();
-  const offset = listIndex * listSize;
+  if (!db) return [];
+  const offset
   const rows = db
     .prepare(
       "SELECT id FROM words WHERE tags LIKE ? ORDER BY (id * 2654435761) % 4294967296 LIMIT ? OFFSET ?"
