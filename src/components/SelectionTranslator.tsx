@@ -69,11 +69,26 @@ export default function SelectionTranslator({
 
       try {
         if (isSingleWord(text)) {
-          // Word lookup in vocab.db
+          // Try vocab.db first, fall back to translation API
           const word = await lookupWord(text);
-          setPopup((prev) =>
-            prev ? { ...prev, word, loading: false } : null
-          );
+          if (word) {
+            setPopup((prev) =>
+              prev ? { ...prev, word, loading: false } : null
+            );
+          } else {
+            // vocab.db miss — use translation API as fallback
+            const resp = await fetch("/api/translate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ text }),
+            });
+            const data = await resp.json();
+            setPopup((prev) =>
+              prev
+                ? { ...prev, translation: data.translation ?? "", loading: false }
+                : null
+            );
+          }
         } else {
           // Phrase / sentence translation via API
           const resp = await fetch("/api/translate", {
@@ -223,10 +238,10 @@ export default function SelectionTranslator({
               </div>
             )}
 
-            {/* Word not in vocab.db — show translation fallback */}
-            {!popup.loading && isSingleWord(popup.selectedText) && !popup.word && !popup.error && (
-              <p className="text-gray-500 dark:text-gray-400 text-xs text-center py-1">
-                词典中未收录此词
+            {/* Single word API translation fallback (when vocab.db is absent) */}
+            {!popup.loading && !popup.word && popup.translation && isSingleWord(popup.selectedText) && (
+              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                {popup.translation}
               </p>
             )}
 
