@@ -47,12 +47,13 @@ export default function SelectionTranslator({
       }
     }
 
-    // Get position from selection bounding rect
+    // Get position relative to the container
     const range = selection?.getRangeAt(0);
     if (!range) return;
     const rect = range.getBoundingClientRect();
-    const x = rect.left + rect.width / 2 + window.scrollX;
-    const y = rect.bottom + window.scrollY + 8;
+    const containerRect = containerRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const x = rect.left + rect.width / 2 - containerRect.left;
+    const y = rect.bottom - containerRect.top + 6;
 
     // Debounce to avoid multiple rapid calls
     if (debounceRef.current) clearTimeout(debounceRef.current);
