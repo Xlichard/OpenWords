@@ -24,31 +24,43 @@ export default function AudioButton({
     window.speechSynthesis.getVoices();
   }, [supported]);
   const speakWord = useCallback(() => {
-    if (!supported || speaking || typeof window === "undefined") return;
+    if (!supported || typeof window === "undefined") return;
 
     const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(word);
-    utterance.lang = accent;
-    utterance.rate = 0.9;
+    try {
+      const utterance = new SpeechSynthesisUtterance(word);
+      utterance.lang = accent;
+      utterance.rate = 0.9;
 
-    const voices = synth.getVoices();
-    const preferred = voices.find((voice) => voice.lang === accent);
-    if (preferred) {
-      utterance.voice = preferred;
+      const voices = synth.getVoices();
+      const preferred = voices.find(
+        (voice) =>
+          voice.lang === accent ||
+          voice.lang.toLowerCase().startsWith(accent.split("-")[0].toLowerCase())
+      );
+      if (preferred) {
+        utterance.voice = preferred;
+      }
+
+      const clearSpeaking = () => setSpeaking(false);
+      setSpeaking(true);
+      utterance.onend = clearSpeaking;
+      utterance.onerror = clearSpeaking;
+
+      if (synth.speaking) synth.cancel();
+      if (synth.paused) synth.resume();
+      synth.speak(utterance);
+
+      // Fallback in case some mobile browsers fail to dispatch end/error.
+      window.setTimeout(clearSpeaking, 4000);
+    } catch {
+      setSpeaking(false);
     }
-
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-
-    synth.cancel();
-    synth.speak(utterance);
-  }, [word, accent, supported, speaking]);
+  }, [word, accent, supported]);
 
   const handleSpeak = useCallback(
     (e: React.SyntheticEvent) => {
       e.stopPropagation();
-      e.preventDefault();
 
       const now = Date.now();
       if (now - lastTriggerTsRef.current < 280) return;
@@ -75,10 +87,13 @@ export default function AudioButton({
   return (
     <button
       type="button"
+      aria-label={accent === "en-US" ? "播放美式发音" : "播放英式发音"}
+      onPointerUp={handleSpeak}
       onClick={handleSpeak}
       onTouchEnd={handleSpeak}
       onPointerDown={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
+      style={{ touchAction: "manipulation" }}
       className={`hover:scale-110 active:scale-95 transition-transform ${
         speaking ? "text-blue-500 animate-pulse" : ""
       } ${className}`}

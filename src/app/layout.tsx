@@ -39,6 +39,12 @@ export default function RootLayout({
                 自定义
               </Link>
               <Link
+                href="/reading"
+                className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+              >
+                外刊
+              </Link>
+              <Link
                 href="/dashboard"
                 className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
               >

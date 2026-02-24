@@ -45,8 +45,12 @@ export default function Flashcard({
         {/* Front Side */}
         <div
           className="absolute inset-0 rounded-2xl bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 p-8 flex flex-col items-center justify-center gap-4 cursor-pointer"
-          style={{ backfaceVisibility: "hidden" }}
+          style={{
+            backfaceVisibility: "hidden",
+            pointerEvents: flipped ? "none" : "auto",
+          }}
           onClick={handleFlip}
+          onTouchEnd={handleFlip}
         >
           <div className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white tracking-tight">
             {word.word}
@@ -81,6 +85,7 @@ export default function Flashcard({
           style={{
             backfaceVisibility: "hidden",
             transform: "rotateY(180deg)",
+            pointerEvents: flipped ? "auto" : "none",
           }}
         >
           <div className="flex-1 flex flex-col items-center justify-center gap-3">
