@@ -245,7 +245,7 @@ export async function lookupWord(word: string): Promise<Word | null> {
 
   const db = getDb();
   if (!db) return null;
-  const cleaned
+  const cleaned = word.trim().replace(/[^a-zA-Z'-]/g, "");
   if (!cleaned) return null;
 
   // Try exact match, then lowercase
