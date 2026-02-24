@@ -1,0 +1,19 @@
+========================================
+  OpenWords 每日外刊更新流程
+========================================
+
+1. 运行爬虫（在 data 目录下）
+   cd E:\OpenWords\data
+   python run_crawler.py
+
+2. 复制数据库到 web 目录
+   copy E:\OpenWords\data\articles.db E:\OpenWords\web\articles.db
+
+3. 导出 JSON（供 Vercel 读取）
+   python E:\OpenWords\web\data\export_web_json.py
+
+4. 提交并推送到 GitHub
+   cd E:\OpenWords\web
+   git add article-data/
+   git commit -m "📰 更新外刊数据"
+   git push

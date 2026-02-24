@@ -1,14 +1,37 @@
 "use server";
 
-import { getArticleDb } from "./article-db";
+import fs from "fs";
+import path from "path";
 import { getDb } from "./db";
 import type {
   Article,
   ArticleWithContent,
-  Paragraph,
-  Sentence,
 } from "@/types/article";
 import type { Word } from "@/types";
+
+// ── Data directory ────────────────────────────────────────────────────────────
+
+const DATA_DIR = path.join(process.cwd(), "article-data");
+
+// ── In-memory index cache (lives for the lifetime of the serverless function) ─
+
+interface ArticleMeta extends Article {
+  paragraph_count: number;
+}
+
+let _indexCache: ArticleMeta[] | null = null;
+
+function loadIndex(): ArticleMeta[] {
+  if (_indexCache) return _indexCache;
+  try {
+    const raw = fs.readFileSync(path.join(DATA_DIR, "index.json"), "utf-8");
+    const data = JSON.parse(raw) as { articles: ArticleMeta[] };
+    _indexCache = data.articles;
+    return _indexCache;
+  } catch {
+    return [];
+  }
+}
 
 // ── Article list ──────────────────────────────────────────────────────────────
 
@@ -30,82 +53,33 @@ interface ArticleRow extends Article {
 export async function getArticles(
   options: ListOptions = {}
 ): Promise<ArticleRow[]> {
-  const db = getArticleDb();
-  if (!db) return [];
-
+  const all = loadIndex();
   const { page = 1, limit = 12, source, difficulty, date, month } = options;
+
+  let filtered = all as ArticleRow[];
+  if (source) filtered = filtered.filter((a) => a.source === source);
+  if (difficulty) filtered = filtered.filter((a) => a.difficulty === difficulty);
+  if (date) filtered = filtered.filter((a) => a.crawled_at.slice(0, 10) === date);
+  else if (month) filtered = filtered.filter((a) => a.crawled_at.slice(0, 7) === month);
+
+  // Index is already sorted by crawled_at DESC from the export script
   const offset = (page - 1) * limit;
-
-  const conditions: string[] = [];
-  const params: (string | number)[] = [];
-
-  if (source) {
-    conditions.push("a.source = ?");
-    params.push(source);
-  }
-  if (difficulty) {
-    conditions.push("a.difficulty = ?");
-    params.push(difficulty);
-  }
-  if (date) {
-    conditions.push("substr(a.crawled_at, 1, 10) = ?");
-    params.push(date);
-  } else if (month) {
-    conditions.push("substr(a.crawled_at, 1, 7) = ?");
-    params.push(month);
-  }
-
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  const rows = db
-    .prepare(
-      `
-      SELECT a.*, COUNT(p.id) AS paragraph_count
-      FROM articles a
-      LEFT JOIN paragraphs p ON p.article_id = a.id
-      ${where}
-      GROUP BY a.id
-      ORDER BY a.crawled_at DESC
-      LIMIT ? OFFSET ?
-      `
-    )
-    .all(...params, limit, offset) as ArticleRow[];
-
-  return rows;
+  return filtered.slice(offset, offset + limit);
 }
 
 export async function getArticleCount(
   options: Pick<ListOptions, "source" | "difficulty" | "date" | "month"> = {}
 ): Promise<number> {
-  const db = getArticleDb();
-  if (!db) return 0;
-
+  const all = loadIndex();
   const { source, difficulty, date, month } = options;
-  const conditions: string[] = [];
-  const params: string[] = [];
 
-  if (source) {
-    conditions.push("source = ?");
-    params.push(source);
-  }
-  if (difficulty) {
-    conditions.push("difficulty = ?");
-    params.push(difficulty);
-  }
-  if (date) {
-    conditions.push("substr(crawled_at, 1, 10) = ?");
-    params.push(date);
-  } else if (month) {
-    conditions.push("substr(crawled_at, 1, 7) = ?");
-    params.push(month);
-  }
+  let filtered = all as ArticleRow[];
+  if (source) filtered = filtered.filter((a) => a.source === source);
+  if (difficulty) filtered = filtered.filter((a) => a.difficulty === difficulty);
+  if (date) filtered = filtered.filter((a) => a.crawled_at.slice(0, 10) === date);
+  else if (month) filtered = filtered.filter((a) => a.crawled_at.slice(0, 7) === month);
 
-  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-  const row = db
-    .prepare(`SELECT COUNT(*) AS count FROM articles ${where}`)
-    .get(...params) as { count: number };
-
-  return row.count;
+  return filtered.length;
 }
 
 // ── Date-based browsing ───────────────────────────────────────────────────────
@@ -128,34 +102,27 @@ export interface MonthEntry {
  * ordered newest first.
  */
 export async function getAvailableDates(): Promise<MonthEntry[]> {
-  const db = getArticleDb();
-  if (!db) return [];
+  const all = loadIndex();
 
-  const rows = db
-    .prepare(
-      `SELECT
-         substr(crawled_at, 1, 7)  AS month,
-         substr(crawled_at, 1, 10) AS date,
-         COUNT(*)                  AS count
-       FROM articles
-       GROUP BY date
-       ORDER BY date DESC`
-    )
-    .all() as { month: string; date: string; count: number }[];
-
-  const monthMap = new Map<string, DayEntry[]>();
-  for (const row of rows) {
-    if (!monthMap.has(row.month)) monthMap.set(row.month, []);
-    monthMap.get(row.month)!.push({
-      date: row.date,
-      day: row.date.slice(8, 10),  // DD
-      count: row.count,
-    });
+  // Group by date
+  const byDate = new Map<string, number>();
+  for (const a of all) {
+    const date = a.crawled_at.slice(0, 10);
+    byDate.set(date, (byDate.get(date) ?? 0) + 1);
   }
 
-  return Array.from(monthMap.entries())
+  // Group by month
+  const byMonth = new Map<string, DayEntry[]>();
+  for (const [date, count] of byDate) {
+    const month = date.slice(0, 7);
+    if (!byMonth.has(month)) byMonth.set(month, []);
+    byMonth.get(month)!.push({ date, day: date.slice(8, 10), count });
+  }
+
+  return Array.from(byMonth.entries())
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([month, days]) => {
+      days.sort((a, b) => b.date.localeCompare(a.date));
       const [y, m] = month.split("-");
       return {
         month,
@@ -168,73 +135,21 @@ export async function getAvailableDates(): Promise<MonthEntry[]> {
 
 // ── Article detail ────────────────────────────────────────────────────────────
 
-interface ParagraphRow {
-  id: number;
-  article_id: number;
-  seq: number;
-  en_text: string;
-  cn_text: string;
-}
-
-interface SentenceRow {
-  id: number;
-  paragraph_id: number;
-  seq: number;
-  en_text: string;
-  cn_text: string;
-  is_complex: number; // SQLite stores as 0/1
-  analysis: string;
-}
-
 export async function getArticleById(
   id: number
 ): Promise<ArticleWithContent | null> {
-  const db = getArticleDb();
-  if (!db) return null;
-
-  const article = db
-    .prepare("SELECT * FROM articles WHERE id = ?")
-    .get(id) as Article | undefined;
-
-  if (!article) return null;
-
-  const paraRows = db
-    .prepare(
-      "SELECT * FROM paragraphs WHERE article_id = ? ORDER BY seq"
-    )
-    .all(id) as ParagraphRow[];
-
-  const sentRows = db
-    .prepare(
-      `SELECT s.* FROM sentences s
-       JOIN paragraphs p ON p.id = s.paragraph_id
-       WHERE p.article_id = ?
-       ORDER BY p.seq, s.seq`
-    )
-    .all(id) as SentenceRow[];
-
-  // Group sentences by paragraph_id
-  const sentsByPara = new Map<number, Sentence[]>();
-  for (const row of sentRows) {
-    const sent: Sentence = {
-      ...row,
-      is_complex: row.is_complex === 1,
-    };
-    if (!sentsByPara.has(row.paragraph_id)) {
-      sentsByPara.set(row.paragraph_id, []);
-    }
-    sentsByPara.get(row.paragraph_id)!.push(sent);
+  try {
+    const raw = fs.readFileSync(
+      path.join(DATA_DIR, "detail", `${id}.json`),
+      "utf-8"
+    );
+    return JSON.parse(raw) as ArticleWithContent;
+  } catch {
+    return null;
   }
-
-  const paragraphs: Paragraph[] = paraRows.map((p) => ({
-    ...p,
-    sentences: sentsByPara.get(p.id) ?? [],
-  }));
-
-  return { ...article, paragraphs };
 }
 
-// ── Word lookup (uses vocab.db) ───────────────────────────────────────────────
+// ── Word lookup (uses vocab.db — gracefully returns null when unavailable) ────
 
 /**
  * Look up a single word in the vocabulary database.
