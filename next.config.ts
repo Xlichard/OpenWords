@@ -3,9 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["better-sqlite3"],
   outputFileTracingIncludes: {
-    // Include articles.db so Vercel bundles it with the serverless function.
-    // vocab.db is local-only (too large to commit) and handled gracefully when absent.
-    "/*": ["./articles.db"],
+    // Bundle .db files with every serverless function route
+    "/api/*": ["./articles.db", "./vocab.db"],
+    "/reading/*": ["./articles.db"],
+    "/*": ["./articles.db", "./vocab.db"],
   },
 };
 

@@ -69,5 +69,7 @@ jobs:
             TODAY=$(date -u +'%Y-%m-%d')
             MSG="📰 Daily article update ${TODAY}"$'\n\nCo-Authored-By: Warp <agent@warp.dev>'
             git commit -m "$MSG"
+            # Rebase onto any commits pushed while the crawl was running
+            git pull --rebase origin master
             git push
           fi
